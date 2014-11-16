@@ -1,25 +1,27 @@
 // Dimensions of sunburst.
 var width = 750;
-var height = 600;
+var height = 550;
 var radius = Math.min(width, height) / 2;
 
 // Breadcrumb dimensions: width, height, spacing, width of tip/tail.
 var b = {
-  w: 75, h: 30, s: 3, t: 10
+  w: 150, h: 30, s: 3, t: 10
 };
 
 // Mapping of step names to colors.
 var colors = {
-  "home": "#5687d1",
-  "product": "#7b615c",
-  "search": "#de783b",
-  "account": "#6ab975",
-  "other": "#a173d1",
-  "end": "#bbbbbb"
+  "com": "#5687d1",
+  "net": "#7b615c",
+  "org": "#de783b",
+  "io": "#6ab975",
+  "co": "#a173d1",
+  "ca": "#BC1D19"
 };
 
 // Total size of all segments; we set this later, after loading the data.
 var totalSize = 0; 
+
+var firstCall = true;
 
 var vis = d3.select("#chart").append("svg:svg")
     .attr("width", width)
@@ -40,23 +42,37 @@ var arc = d3.svg.arc()
 
 // Use d3.text and d3.csv.parseRows so that we do not need to have a header
 // row, and can receive the csv as an array of arrays.
-d3.text("visit-sequences.csv", function(text) {
-  var csv = d3.csv.parseRows(text);
-  var json = buildHierarchy(csv);
-  createVisualization(json);
-});
+function getData() {
+  d3.json('/data', function(json) {
+    var csv = [];
+    var time = Date.now();
+    for (var k in json) {
+      var sum = 0;
+      for (var i = 0; i < 60; i++) {
+        sum += json[k].data[i].count;
+      }
+      json[k].sum = sum;
+      csv.push([k, sum]);
+    }
+    var newJson = buildHierarchy(csv);
+    createVisualization(newJson);
+  });
+}
+getData();
+setInterval(getData, 15000);
 
 // Main function to draw and set up the visualization, once we have the data.
 function createVisualization(json) {
 
-  // Basic setup of page elements.
-  initializeBreadcrumbTrail();
-  drawLegend();
-  d3.select("#togglelegend").on("click", toggleLegend);
+  if (firstCall) {
+    // Basic setup of page elements.
+    initializeBreadcrumbTrail();
+    firstCall = false;
+  }
 
   // Bounding circle underneath the sunburst, to make it easier to detect
   // when the mouse leaves the parent g.
-  vis.append("svg:circle")
+  vis.selectAll('*').remove().append("svg:circle")
       .attr("r", radius)
       .style("opacity", 0);
 
@@ -72,7 +88,7 @@ function createVisualization(json) {
       .attr("display", function(d) { return d.depth ? null : "none"; })
       .attr("d", arc)
       .attr("fill-rule", "evenodd")
-      .style("fill", function(d) { return colors[d.name]; })
+      .style("fill", function(d) { return colors[d.root]; })
       .style("opacity", 1)
       .on("mouseover", mouseover);
 
@@ -99,6 +115,17 @@ function mouseover(d) {
       .style("visibility", "");
 
   var sequenceArray = getAncestors(d);
+  var combined = "";
+  for (var i in sequenceArray) {
+    if (i == 0) {
+      combined = sequenceArray[i].name;
+    }
+    else {
+      combined = sequenceArray[i].name + '.' + combined;
+    }
+  }
+  d3.select('#domain').text(combined);
+  d3.select("#domain").style("visibility", "");
   updateBreadcrumbs(sequenceArray, percentageString);
 
   // Fade all the segments.
@@ -126,7 +153,7 @@ function mouseleave(d) {
   // Transition each segment to full opacity and then reactivate it.
   d3.selectAll("path")
       .transition()
-      .duration(1000)
+      .duration(400)
       .style("opacity", 1)
       .each("end", function() {
               d3.select(this).on("mouseover", mouseover);
@@ -134,6 +161,7 @@ function mouseleave(d) {
 
   d3.select("#explanation")
       .style("visibility", "hidden");
+  d3.select("#domain").style("visibility", "hidden");
 }
 
 // Given a node in a partition layout, return an array of all of its ancestor
@@ -187,7 +215,7 @@ function updateBreadcrumbs(nodeArray, percentageString) {
 
   entering.append("svg:polygon")
       .attr("points", breadcrumbPoints)
-      .style("fill", function(d) { return colors[d.name]; });
+      .style("fill", function(d) { return colors[d.root]; });
 
   entering.append("svg:text")
       .attr("x", (b.w + b.t) / 2)
@@ -218,48 +246,6 @@ function updateBreadcrumbs(nodeArray, percentageString) {
 
 }
 
-function drawLegend() {
-
-  // Dimensions of legend item: width, height, spacing, radius of rounded rect.
-  var li = {
-    w: 75, h: 30, s: 3, r: 3
-  };
-
-  var legend = d3.select("#legend").append("svg:svg")
-      .attr("width", li.w)
-      .attr("height", d3.keys(colors).length * (li.h + li.s));
-
-  var g = legend.selectAll("g")
-      .data(d3.entries(colors))
-      .enter().append("svg:g")
-      .attr("transform", function(d, i) {
-              return "translate(0," + i * (li.h + li.s) + ")";
-           });
-
-  g.append("svg:rect")
-      .attr("rx", li.r)
-      .attr("ry", li.r)
-      .attr("width", li.w)
-      .attr("height", li.h)
-      .style("fill", function(d) { return d.value; });
-
-  g.append("svg:text")
-      .attr("x", li.w / 2)
-      .attr("y", li.h / 2)
-      .attr("dy", "0.35em")
-      .attr("text-anchor", "middle")
-      .text(function(d) { return d.key; });
-}
-
-function toggleLegend() {
-  var legend = d3.select("#legend");
-  if (legend.style("visibility") == "hidden") {
-    legend.style("visibility", "");
-  } else {
-    legend.style("visibility", "hidden");
-  }
-}
-
 // Take a 2-column CSV and transform it into a hierarchical structure suitable
 // for a partition layout. The first column is a sequence of step names, from
 // root to leaf, separated by hyphens. The second column is a count of how 
@@ -272,32 +258,32 @@ function buildHierarchy(csv) {
     if (isNaN(size)) { // e.g. if this is a header row
       continue;
     }
-    var parts = sequence.split("-");
+    var parts = sequence.split(".").reverse();
     var currentNode = root;
     for (var j = 0; j < parts.length; j++) {
       var children = currentNode["children"];
       var nodeName = parts[j];
       var childNode;
       if (j + 1 < parts.length) {
-   // Not yet at the end of the sequence; move down the tree.
-  var foundChild = false;
-  for (var k = 0; k < children.length; k++) {
-    if (children[k]["name"] == nodeName) {
-      childNode = children[k];
-      foundChild = true;
-      break;
-    }
-  }
-  // If we don't already have a child node for this branch, create it.
-  if (!foundChild) {
-    childNode = {"name": nodeName, "children": []};
-    children.push(childNode);
-  }
-  currentNode = childNode;
+         // Not yet at the end of the sequence; move down the tree.
+        var foundChild = false;
+        for (var k = 0; k < children.length; k++) {
+          if (children[k]["name"] == nodeName) {
+            childNode = children[k];
+            foundChild = true;
+            break;
+          }
+        }
+        // If we don't already have a child node for this branch, create it.
+        if (!foundChild) {
+          childNode = {"name": nodeName, "root": parts[0], "children": []};
+          children.push(childNode);
+        }
+        currentNode = childNode;
       } else {
-  // Reached the end of the sequence; create a leaf node.
-  childNode = {"name": nodeName, "size": size};
-  children.push(childNode);
+        // Reached the end of the sequence; create a leaf node.
+        childNode = {"name": nodeName, "size": size, "root": parts[0], "children": []};
+        children.push(childNode);
       }
     }
   }

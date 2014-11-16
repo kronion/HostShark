@@ -1,39 +1,51 @@
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: 'Open Sans', sans-serif;
   font-size: 12px;
   font-weight: 400;
   background-color: #fff;
-  width: 960px;
-  height: 700px;
+  width: 100%;
+  height: 550px;
   margin-top: 10px;
+  margin-left: 10px;
 }
 
 #main {
+  width: 100%;
   float: left;
-  width: 750px;
-}
-
-#sidebar {
-  float: right;
-  width: 100px;
 }
 
 #sequence {
-  width: 600px;
   height: 70px;
 }
 
-#legend {
-  padding: 10px 0 0 3px;
+#sequence > svg {
+  width: 100%;
 }
 
-#sequence text, #legend text {
+#sequence text {
   font-weight: 600;
   fill: #fff;
 }
 
+#domain {
+  position: absolute;
+  left: 10px;
+  top: 50px;
+  font-size: 20px;
+}
+
 #chart {
   position: relative;
+}
+
+#chart > svg {
+  display: block;
+  margin: 0 auto;
 }
 
 #chart path {
@@ -42,9 +54,10 @@ body {
 
 #explanation {
   position: absolute;
-  top: 260px;
-  left: 305px;
+  top: 230px;
+  left: 50%;
   width: 140px;
+  margin-left: -70px;
   text-align: center;
   color: #666;
   z-index: -1;
