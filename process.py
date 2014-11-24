@@ -5,7 +5,6 @@ import time
 import urllib2
 
 ips = {}
-hosts = {}
 
 with SocketIO('localhost', 7717) as socketIO:
     try:
